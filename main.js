@@ -3,6 +3,7 @@ const os = require('os');
 const fs = require('fs');
 const dns = require('dns');
 const net = require('net');
+const varint = require('varint');
 
 function formatMinecraftText(text) {
     if (typeof text != "string") return text;
@@ -78,7 +79,7 @@ function ping(ip, port, protocol, timeout) {
             resolve(false);
         }, timeout);
 
-        client.connect(port, ip, () => {
+        client.connect(port, ip, () => { // handshake
             const handshakePacket = Buffer.concat([
                 Buffer.from([0x00]),
                 Buffer.from(varint.encode(protocol)),
@@ -152,6 +153,10 @@ function handleSearchQuery(searchParams, res) {
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.write(`
         <head>
+            <title>Mc Server Search</title>
+            <meta name="description" content="Search for Minecraft servers">
+            <meta name="keywords" content="Minecraft, server, search">
+            ${fs.readFileSync("image2.txt")}
             <style>
                 body { font-family: Arial; }
                 img { width: 64px; height: 64px; float: left; margin-right: 10px; }
@@ -159,6 +164,7 @@ function handleSearchQuery(searchParams, res) {
                 h3 { margin-top: 0; }
                 p { margin-top: 0; }
                 .server { 
+                    position: relative;
                     margin-bottom: 20px; 
                     border: 1px solid black;
                     padding: 10px;
@@ -273,6 +279,42 @@ function handleSearchQuery(searchParams, res) {
                 </form>
             </div>
         </div>
+        <script>
+            async function pingServer(ip, port) {
+                try {
+                    const response = await fetch("https://api.mcsrvstat.us/2/"+ip+":"+port);
+                    const data = await response.json();
+                    console.log(data);
+                    return data;
+                } catch (error) {
+                    console.error("Error pinging "+ip+":"+port+" - "+error.message);
+                    return null;
+                }
+            }
+
+            async function updateServerStatus() {
+                const servers = document.querySelectorAll('.server');
+                const pingPromises = Array.from(servers).map(async (server) => {
+                    const ip = server.getAttribute('data-ip');
+                    const port = server.getAttribute('data-port');
+                    const data = await pingServer(ip, port);
+
+                    if (data && data.online) {
+                        server.querySelector('.status').textContent = 'online';
+                        server.querySelector('.status').style.backgroundColor = 'green';
+                        server.querySelector('.playercount').textContent = data.players.online || 0;
+                    } else {
+                        server.querySelector('.status').textContent = 'offline';
+                        server.querySelector('.status').style.backgroundColor = 'grey';
+                        server.querySelector('.playercount').textContent = 0;
+                    }
+                });
+
+                await Promise.all(pingPromises);
+            }
+
+            document.addEventListener('DOMContentLoaded', updateServerStatus);
+        </script>
     `);
     res.write('<h2>Search Results</h2>');
     res.write(`retrieved ${totalResults} results`);
@@ -346,7 +388,7 @@ function formatExtraDescription(extraDescription) {
 }
 
 function writeResponse(hostname, server, description, motd, res) {
-    res.write('<div class="server">');
+    res.write('<div class="server" data-ip="' + server.ip + '" data-port="' + server.port + '">');
     if (server.icon) {
         res.write(`<img src="${server.icon}"/>`);
     } else {
@@ -367,8 +409,23 @@ function writeResponse(hostname, server, description, motd, res) {
         res.write('<h3>no description</h3>');
     }
     res.write(`<p>${formatMinecraftText(motd)}</p>`);
-    res.write(`<p>max players: ${server.maxPlayers || "?"}</p>`);
+    res.write(`<p>players: <span class="playercount">loading...</span>/${server.maxPlayers || "?"}</p>`);
     res.write(`<p style="text-size: 5px;">${server.version || "unknown version"}</p>`);
+    res.write(`
+        <style>
+            .status {
+                position: absolute;
+                top: 10px;
+                right: 10px;
+                font-size: 14px;
+                color: white;
+                background-color: grey;
+                padding: 5px;
+                border-radius: 5px;
+            }
+        </style>
+        <p class="status">loading...</p>
+    `);
     res.write('</div>');
 }
 
@@ -392,6 +449,7 @@ function handleServerDetails(ip, res) {
                     h3 { margin-top: 0; }
                     p { margin-top: 0; }
                     .server { 
+                        position: relative;
                         margin-bottom: 20px; 
                         padding: 10px;
                         overflow: auto; /* Ensure the container clears the floated image */
@@ -405,14 +463,45 @@ function handleServerDetails(ip, res) {
                         .server { border-color: #000000; }
                     }
                 </style>
+                <script>
+                    async function pingServer(ip, port) {
+                        try {
+                            const response = await fetch(\`https://api.mcsrvstat.us/2/\${ip}:\${port}\`);
+                            const data = await response.json();
+                            return data;
+                        } catch (error) {
+                            console.error(\`Error pinging \${ip}:\${port} - \${error.message}\`);
+                            return null;
+                        }
+                    }
+
+                    async function updateServerStatus() {
+                        const server = document.querySelector('.server');
+                        const ip = server.getAttribute('data-ip');
+                        const port = server.getAttribute('data-port');
+                        const data = await pingServer(ip, port);
+
+                        if (data && data.online) {
+                            server.querySelector('.status').textContent = 'online';
+                            server.querySelector('.status').style.backgroundColor = 'green';
+                            server.querySelector('.playercount').textContent = data.players.online || 0;
+                        } else {
+                            server.querySelector('.status').textContent = 'offline';
+                            server.querySelector('.status').style.backgroundColor = 'grey';
+                            server.querySelector('.playercount').textContent = 0;
+                        }
+                    }
+
+                    document.addEventListener('DOMContentLoaded', updateServerStatus);
+                </script>
             </head>`);
-        res.write('<div class="server">');
+        res.write('<div class="server" data-ip="' + server.ip + '" data-port="' + server.port + '">');
         if (server.icon) {
             res.write(`<img src="${server.icon}"/>`);
         } else {
             res.write(fs.readFileSync('image.txt'));
         }
-        if(server.hostname && server.hostname !== server.ip) {
+        if (server.hostname && server.hostname !== server.ip) {
             res.write(`<h1>${server.hostname} (${server.ip})</h1>`);
         } else {
             res.write(`<h1>${server.ip}</h1>`);
@@ -421,6 +510,22 @@ function handleServerDetails(ip, res) {
         res.write(`<p>${formatMinecraftText(server.motd) || "no message of the day"}</p>`);
         res.write(`<p>max players: ${server.maxPlayers || "?"}</p>`);
         res.write(`<p>version: ${server.version || "unknown version"}</p>`);
+        res.write(`<p>players: <span class="playercount">loading...</span>/${server.maxPlayers || "?"}</p>`);
+        res.write(`
+            <style>
+                .status {
+                    position: absolute;
+                    top: 10px;
+                    right: 10px;
+                    font-size: 14px;
+                    color: white;
+                    background-color: grey;
+                    padding: 5px;
+                    border-radius: 5px;
+                }
+            </style>
+            <p class="status">loading...</p>
+        `);
         res.write(`<div class="space"></div>`);
         res.write(`<div class="space"></div>`);
         res.write(`<h1>dev Info</h1>`);
@@ -452,15 +557,11 @@ const server = http.createServer((req, res) => {
             }
         } else if (path === '/about') {
             res.writeHead(200, { 'Content-Type': 'text/html' });
-            res.write('<h1>About Us</h1>');
-            res.end();
-        } else if (path === '/contact') {
-            res.writeHead(200, { 'Content-Type': 'text/html' });
-            res.write('<h1>Contact Us</h1>');
+            res.write(fs.readFileSync('./website/about.html'));
             res.end();
         } else if (path === '/data') {
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.write(JSON.stringify({ message: 'Hello World!' }));
+            res.write(JSON.stringify(data));
             res.end();
         } else if (path === '/server') {
             const ip = searchParams.get('ip');
