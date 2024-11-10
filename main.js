@@ -305,7 +305,7 @@ function handleSearchQuery(searchParams, res) {
                         server.querySelector('.playercount').textContent = data.players.online || 0;
                     } else {
                         server.querySelector('.status').textContent = 'offline';
-                        server.querySelector('.status').style.backgroundColor = 'grey';
+                        server.querySelector('.status').style.backgroundColor = 'red';
                         server.querySelector('.playercount').textContent = 0;
                     }
                 });
