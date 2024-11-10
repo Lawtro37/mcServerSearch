@@ -475,6 +475,6 @@ const server = http.createServer((req, res) => {
     }
 });
 
-server.listen(443, "https://mcserversearch.onrender.com", () => {
+server.listen(443, () => {
     console.log(`Server running at http://${getNetworkIP()}(https://mcserversearch.onrender.com):3000/`);
 });
