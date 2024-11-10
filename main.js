@@ -1,7 +1,6 @@
 const http = require('http');
 const os = require('os');
 const fs = require('fs');
-const mc = require('minecraft-ping');
 const dns = require('dns');
 const net = require('net');
 
@@ -476,6 +475,6 @@ const server = http.createServer((req, res) => {
     }
 });
 
-server.listen(3000, getNetworkIP(), () => {
-    console.log(`Server running at http://${getNetworkIP()}:3000/`);
+server.listen(443, "https://mcserversearch.onrender.com", () => {
+    console.log(`Server running at http://${getNetworkIP()}(https://mcserversearch.onrender.com):3000/`);
 });
