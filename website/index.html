@@ -92,6 +92,32 @@
             background-color: var(--input-background-color);
             color: var(--text-color);
         }
+        .about {
+            position: absolute;
+            /* bottom right corner */
+            bottom: 5px;
+            right: 10px;
+            font-size: 14px;
+            color: var(--text-color);
+        }
+        .about a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        .about a:hover {
+            text-decoration: underline;
+            cursor: pointer;
+        }
+        .about a:visited {
+            color: #007bff;
+        }
+        .about a:visited:hover {
+            text-decoration: underline;
+            cursor: pointer;
+        }
+        .about a:active {
+            color: #0056b3;
+        }
 
         /* Light theme */
         :root {
@@ -193,6 +219,15 @@
             <option value="bedrock">Bedrock</option>
         </select>
     </div>
+    <div class="about">
+        <p><a onclick="handleAboutClick(event)">About</a></p>
+    </div>
+    <script>
+        function handleAboutClick(event) {
+            event.preventDefault(); // Prevent the default link behavior
+            window.location.href = '/about';
+        }
+    </script>
     <script>
         function search() {
             var input = document.querySelector('input[name="search"]').value;
