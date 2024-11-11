@@ -596,13 +596,36 @@ const server = http.createServer((req, res) => {
         } else {
             res.writeHead(404, { 'Content-Type': 'text/html' });
             res.write('<h1>404 Not Found</h1>');
+            res.write(`<img style="width: 50%; height: 50%" src="data:image/png;base64,${fs.readFileSync("./cob.png").toString("base64")}" alt="Error 404">`);
             res.end();
         }
     } catch (error) {
         console.error(`Error handling request: ${error.message}`);
     }
 });
+ 
+function start() {
+    server.listen(443, () => {
+        console.log(`Server running at http://${getNetworkIP()}(https://mcserversearch.onrender.com):443/`);
+    });
+}
 
-server.listen(443, () => {
-    console.log(`Server running at http://${getNetworkIP()}(https://mcserversearch.onrender.com):443/`);
+start()
+
+server.on('error', (err) => {
+    console.error(`Server error: ${err.message}`);
+});
+
+process.on('uncaughtException', (err) => {
+    console.error(`Uncaught exception: ${err.message}`);
+    //restart the server
+    server.close();
+    start();
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error(`Unhandled rejection: ${reason}`);
+    //restart the server
+    server.close();
+    start();
 });
