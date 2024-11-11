@@ -282,7 +282,7 @@ function handleSearchQuery(searchParams, res) {
         <script>
             async function pingServer(ip, port) {
                 try {
-                    const response = await fetch("https://api.mcsrvstat.us/2/"+ip+":"+port);
+                    const response = await fetch("https://api.mcsrvstat.us/3/"+ip+":"+port);
                     const data = await response.json();
                     console.log(data);
                     return data;
@@ -466,7 +466,7 @@ function handleServerDetails(ip, res) {
                 <script>
                     async function pingServer(ip, port) {
                         try {
-                            const response = await fetch(\`https://api.mcsrvstat.us/2/\${ip}:\${port}\`);
+                            const response = await fetch(\`https://api.mcsrvstat.us/3/\${ip}:\${port}\`);
                             const data = await response.json();
                             return data;
                         } catch (error) {
@@ -487,7 +487,7 @@ function handleServerDetails(ip, res) {
                             server.querySelector('.playercount').textContent = data.players.online || 0;
                         } else {
                             server.querySelector('.status').textContent = 'offline';
-                            server.querySelector('.status').style.backgroundColor = 'grey';
+                            server.querySelector('.status').style.backgroundColor = 'red';
                             server.querySelector('.playercount').textContent = 0;
                         }
                     }
@@ -566,6 +566,22 @@ const server = http.createServer((req, res) => {
         } else if (path === '/server') {
             const ip = searchParams.get('ip');
             handleServerDetails(ip, res);
+        } else if (path === '/sitemap') {
+            res.writeHead(200, { 'Content-Type': 'text/xml' });
+            res.write(fs.readFileSync('./website/sitemap.xml'));
+            res.end();
+        } else if (path === '/sitemap.xml') {
+            res.writeHead(200, { 'Content-Type': 'text/xml' });
+            res.write(fs.readFileSync('./website/sitemap.xml'));
+            res.end();
+        } else if (path === '/robots') {
+            res.writeHead(200, { 'Content-Type': 'text/plain' });
+            res.write(fs.readFileSync('./website/robots.txt'));
+            res.end();
+        } else if (path === '/robots.txt') {
+            res.writeHead(200, { 'Content-Type': 'text/plain' });
+            res.write(fs.readFileSync('./website/robots.txt'));
+            res.end();
         } else {
             res.writeHead(404, { 'Content-Type': 'text/html' });
             res.write('<h1>404 Not Found</h1>');
@@ -577,5 +593,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(443, () => {
-    console.log(`Server running at http://${getNetworkIP()}(https://mcserversearch.onrender.com):3000/`);
+    console.log(`Server running at http://${getNetworkIP()}(https://mcserversearch.onrender.com):443/`);
 });
