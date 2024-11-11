@@ -118,7 +118,8 @@ function ping(ip, port, protocol, timeout) {
 }
 
 function removeFormattingCodes(text) {
-    if(typeof text != "string") return text;
+    if(typeof text != "string") return null;
+    if (!text) return null;
     return text.replace(/§[0-9a-fk-or]/gi, '').replace(/&[0-9a-fk-or]/gi, '');
 }
 
@@ -127,6 +128,7 @@ function handleSearchQuery(searchParams, res) {
     const search = searchParams.get('search')?.toLowerCase();
     const edition = searchParams.get('edition');
     const page = parseInt(searchParams.get('page')) || 1;
+    const resultsPerPage = parseInt(searchParams.get('resultsPerPage')) || RESULTS_PER_PAGE;
     let results = data;
 
     if (version && version !== 'all' && version !== '') {
@@ -142,10 +144,10 @@ function handleSearchQuery(searchParams, res) {
     if (search) {
         console.log(`searching for: ${search}`);
         results = results.filter(server => {
-            const cleanedDescription = removeFormattingCodes(server.description || '');
-            const cleanedMotd = removeFormattingCodes(server.motd || '');
-            const cleanedHostname = removeFormattingCodes(server.hostname || '');
-            const cleanedIp = removeFormattingCodes(server.ip || '');
+            const cleanedDescription = removeFormattingCodes(server.description || '') || "";
+            const cleanedMotd = removeFormattingCodes(server.motd || '') || "";
+            const cleanedHostname = removeFormattingCodes(server.hostname || '') || "";
+            const cleanedIp = removeFormattingCodes(server.ip || '') || "";
 
             return (
                 cleanedDescription.toLowerCase().includes(search) ||
@@ -157,9 +159,9 @@ function handleSearchQuery(searchParams, res) {
     }
 
     const totalResults = results.length;
-    const totalPages = Math.ceil(totalResults / RESULTS_PER_PAGE);
-    const startIndex = (page - 1) * RESULTS_PER_PAGE;
-    const endIndex = Math.min(startIndex + RESULTS_PER_PAGE, totalResults);
+    const totalPages = Math.ceil(totalResults / resultsPerPage);
+    const startIndex = (page - 1) * resultsPerPage;
+    const endIndex = Math.min(startIndex + resultsPerPage, totalResults);
     results = results.slice(startIndex, endIndex);
 
     res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -287,6 +289,8 @@ function handleSearchQuery(searchParams, res) {
                         <option value="java">Java</option>
                         <option value="bedrock">Bedrock</option>
                     </select>
+                    <label for="resultsPerPage">Results per page:</label>
+                    <input type="number" id="resultsPerPage" name="resultsPerPage" value="${resultsPerPage}">
                     <input type="submit" value="Submit">
                 </form>
             </div>
@@ -355,10 +359,10 @@ function handleSearchQuery(searchParams, res) {
             if (pendingLookups === 0) {
                 res.write('<div class="pagination">');
                 if (page > 1) {
-                    res.write(`<a href="?search=${search}&version=${version}&page=${page - 1}">Previous</a>`);
+                    res.write(`<a href="?search=${search}&version=${version}&edition=${edition}&resultsPerPage=${resultsPerPage}&page=${page - 1}">Previous</a>`);
                 }
                 if (page < totalPages) {
-                    res.write(`<a href="?search=${search}&version=${version}&page=${page + 1}">Next</a>`);
+                    res.write(`<a href="?search=${search}&version=${version}&edition=${edition}&resultsPerPage=${resultsPerPage}&page=${page + 1}">Next</a>`);
                 }
                 res.write(`Page ${page} of ${totalPages}`);
                 res.write('</div>');
