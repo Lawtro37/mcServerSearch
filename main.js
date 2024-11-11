@@ -118,6 +118,7 @@ function ping(ip, port, protocol, timeout) {
 }
 
 function removeFormattingCodes(text) {
+    if(typeof text != "string") return text;
     return text.replace(/§[0-9a-fk-or]/gi, '').replace(/&[0-9a-fk-or]/gi, '');
 }
 
