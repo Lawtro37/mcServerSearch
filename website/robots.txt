@@ -11,4 +11,4 @@ Disallow: /servers copy 2.json
 Disallow: /servers copy.json
 Disallow: /servers.json
 
-Sitemap: https://mcserverseatch.lawtrostudios.com/sitemap
+Sitemap: https://mcserversearch.lawtrostudios.com/sitemap
