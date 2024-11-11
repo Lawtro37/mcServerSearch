@@ -1,0 +1,14 @@
+User-agent: *
+Disallow: /exclude.conf
+Disallow: /image.txt
+Disallow: /image2.txt
+Disallow: /indexer.js
+Disallow: /ips1.json
+Disallow: /masscan.exe
+Disallow: /mc search.pdn
+Disallow: /queary.js
+Disallow: /servers copy 2.json
+Disallow: /servers copy.json
+Disallow: /servers.json
+
+Sitemap: https://mcserverseatch.lawtrostudios.com/sitemap
