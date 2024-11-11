@@ -117,6 +117,10 @@ function ping(ip, port, protocol, timeout) {
     });
 }
 
+function removeFormattingCodes(text) {
+    return text.replace(/§[0-9a-fk-or]/gi, '').replace(/&[0-9a-fk-or]/gi, '');
+}
+
 function handleSearchQuery(searchParams, res) {
     const version = searchParams.get('version');
     const search = searchParams.get('search')?.toLowerCase();
@@ -136,12 +140,19 @@ function handleSearchQuery(searchParams, res) {
 
     if (search) {
         console.log(`searching for: ${search}`);
-        results = results.filter(server =>
-            (server.description && typeof server.description === "string" && server.description.toLowerCase().includes(search)) ||
-            (server.motd && typeof server.motd === "string" && server.motd.toLowerCase().includes(search)) ||
-            (server.hostname && typeof server.hostname === "string" && server.hostname.toLowerCase().includes(search)) ||
-            (server.ip && typeof server.ip === "string" && server.ip.toLowerCase().includes(search))
-        );
+        results = results.filter(server => {
+            const cleanedDescription = removeFormattingCodes(server.description || '');
+            const cleanedMotd = removeFormattingCodes(server.motd || '');
+            const cleanedHostname = removeFormattingCodes(server.hostname || '');
+            const cleanedIp = removeFormattingCodes(server.ip || '');
+
+            return (
+                cleanedDescription.toLowerCase().includes(search) ||
+                cleanedMotd.toLowerCase().includes(search) ||
+                cleanedHostname.toLowerCase().includes(search) ||
+                cleanedIp.toLowerCase().includes(search)
+            );
+        });
     }
 
     const totalResults = results.length;
