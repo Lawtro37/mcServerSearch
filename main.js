@@ -296,7 +296,7 @@ function handleSearchQuery(searchParams, res) {
         <script>
             async function pingServer(ip, port) {
                 try {
-                    const response = await fetch("https://api-mcserversearch.lawtrostudios.com/status/1/"+ip+"/"+port, { method: "GET", headers: { 'Content-Type': 'application/json' }});
+                    const response = await fetch("https://api-mcserversearch.lawtrostudios.com/status/1/"+ip+"/"+port, { method: "GET", mode: "cors", credentials: "same-origin", headers: { 'Content-Type': 'application/json' }});
                     const data = await response.json();
                     console.log(data);
                     return data;
