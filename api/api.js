@@ -5,7 +5,8 @@ const os = require('os');
 const { env } = require('process');
 
 // Get environment variables
-const STRICT_REFERER = process.env.STRICT_REFERER || false;
+let STRICT_REFERER = process.env.STRICT_REFERER || false;
+STRICT_REFERER = STRICT_REFERER === 'true' || STRICT_REFERER === '1';
 const REFERER = process.env.REFERER || 'mcserversearch.lawtrostudios.com';
 
 function getNetworkIP() {
