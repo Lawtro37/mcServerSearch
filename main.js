@@ -289,8 +289,6 @@ function handleSearchQuery(searchParams, res) {
                         <option value="java">Java</option>
                         <option value="bedrock">Bedrock</option>
                     </select>
-                    <label for="resultsPerPage">Results per page:</label>
-                    <input type="number" id="resultsPerPage" name="resultsPerPage" value="${resultsPerPage}">
                     <input type="submit" value="Submit">
                 </form>
             </div>
@@ -298,7 +296,7 @@ function handleSearchQuery(searchParams, res) {
         <script>
             async function pingServer(ip, port) {
                 try {
-                    const response = await fetch("https://api.mcsrvstat.us/3/"+ip+":"+port);
+                    const response = await fetch("https://mcserversearch-api.onrender.com/3/"+ip+"/"+port, { method: "GET", headers: { 'Content-Type': 'application/json' }});
                     const data = await response.json();
                     console.log(data);
                     return data;
@@ -329,7 +327,37 @@ function handleSearchQuery(searchParams, res) {
                 await Promise.all(pingPromises);
             }
 
+            function findServerGeoLocation(ip) {
+                return fetch('http://ip-api.com/json/'+ip, { method: "GET", mode: 'cors', headers: { 'Content-Type': 'application/json' }})
+                    .then(response => response.json())
+                    .then(data => {
+                        return data;
+                    });
+            }
+
+            function updateServerGeoLocation() {
+                const servers = document.querySelectorAll('.server');
+                const geoLocationPromises = Array.from(servers).map(async (server) => {
+                    const ip = server.getAttribute('data-ip');
+                    const data = await findServerGeoLocation(ip);
+                    console.log(data);
+
+                    if (data) {
+                        server.querySelector('.geolocation').textContent = data.country || 'unknown';
+                        server.querySelector('.geolocation').style.backgroundColor = 'green';
+                    } else {
+                        server.querySelector('.geolocation').style.backgroundColor = 'red';
+                        server.querySelector('.geolocation').textContent = 'unknown';
+                    }
+                });
+
+                Promise.all(geoLocationPromises).then(() => {
+                    console.log('Finished updating server geolocations');
+                });
+            }
+
             document.addEventListener('DOMContentLoaded', updateServerStatus);
+            document.addEventListener('DOMContentLoaded', updateServerGeoLocation);
         </script>
     `);
     res.write('<h2>Search Results</h2>');
@@ -359,10 +387,10 @@ function handleSearchQuery(searchParams, res) {
             if (pendingLookups === 0) {
                 res.write('<div class="pagination">');
                 if (page > 1) {
-                    res.write(`<a href="?search=${search}&version=${version}&edition=${edition}&resultsPerPage=${resultsPerPage}&page=${page - 1}">Previous</a>`);
+                    res.write(`<a href="?search=${search}&version=${version}&edition=${edition}&page=${page - 1}">Previous</a>`);
                 }
                 if (page < totalPages) {
-                    res.write(`<a href="?search=${search}&version=${version}&edition=${edition}&resultsPerPage=${resultsPerPage}&page=${page + 1}">Next</a>`);
+                    res.write(`<a href="?search=${search}&version=${version}&edition=${edition}&page=${page + 1}">Next</a>`);
                 }
                 res.write(`Page ${page} of ${totalPages}`);
                 res.write('</div>');
@@ -442,6 +470,21 @@ function writeResponse(hostname, server, description, motd, res) {
         </style>
         <p class="status">loading...</p>
     `);
+    res.write(`
+        <style>
+            .geolocation {
+                font-size: 14px;
+                color: white;
+                background-color: grey;
+                padding: 5px;
+                border-radius: 5px;
+                position: absolute;
+                bottom: 10px;   
+                right: 10px;
+            }
+        </style>
+        <p><span class="geolocation">loading geolocation...</span></p>
+        `);
     res.write('</div>');
 }
 
