@@ -40,6 +40,7 @@ const server = http.createServer((req, res) => {
         if (STRICT_REFERER && req.headers.referer !== REFERER) {
             res.writeHead(403, { 'Content-Type': 'text/plain' });
             res.end(`This function is only available to "${REFERER}" \n Error 403 (Forbidden)`);
+            console.log(`access denied from ${req.headers.referer}`);
             return;
         }
 
