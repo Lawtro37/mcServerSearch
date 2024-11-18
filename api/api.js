@@ -9,6 +9,9 @@ let STRICT_REFERER = process.env.STRICT_REFERER || false;
 STRICT_REFERER = STRICT_REFERER === 'true' || STRICT_REFERER === '1';
 const REFERER = process.env.REFERER || 'mcserversearch.lawtrostudios.com';
 
+console.log(`STRICT_REFERER: ${STRICT_REFERER}`);
+console.log(`REFERER: ${REFERER}`);
+
 function getNetworkIP() {
     const interfaces = os.networkInterfaces();
     for (const name of Object.keys(interfaces)) {
