@@ -294,16 +294,17 @@ function handleSearchQuery(searchParams, res) {
             </div>
         </div>
         <script>
-            async function pingServer(ip, port) {
-                try {
-                    const response = await fetch("https://api-mcserversearch.lawtrostudios.com/status/1/"+ip+"/"+port, { method: "GET", mode: "cors", credentials: "same-origin", headers: { 'Content-Type': 'application/json' }});
-                    const data = await response.json();
-                    console.log(data);
-                    return data;
-                } catch (error) {
-                    console.error("Error pinging "+ip+":"+port+" - "+error.message);
-                    return null;
-                }
+            function pingServer(ip, port) {
+                return fetch(\`https://api.mcsrvstat.us/3/\${ip}:\${port}\`)
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log(data);
+                        return data;
+                    })
+                    .catch(error => {
+                        console.error(\`Error pinging \${ip}:\${port} - \${error.message}\`);
+                        return null;
+                    });
             }
 
             async function updateServerStatus() {
@@ -328,14 +329,16 @@ function handleSearchQuery(searchParams, res) {
             }
 
             function findServerGeoLocation(ip) {
-                return fetch('http://ip-api.com/json/'+ip, { method: "GET", mode: 'cors', headers: { 'Content-Type': 'application/json' }})
+                return fetch(\`http://ip-api.com/json/\${ip}\`, { method: "GET", mode: 'cors', headers: { 'Content-Type': 'application/json' }})
                     .then(response => response.json())
-                    .then(data => {
-                        return data;
+                    .then(data => data)
+                    .catch(error => {
+                        console.error(\`Error fetching geolocation for \${ip} - \${error.message}\`);
+                        return null;
                     });
             }
 
-            function updateServerGeoLocation() {
+            async function updateServerGeoLocation() {
                 const servers = document.querySelectorAll('.server');
                 const geoLocationPromises = Array.from(servers).map(async (server) => {
                     const ip = server.getAttribute('data-ip');
@@ -351,13 +354,81 @@ function handleSearchQuery(searchParams, res) {
                     }
                 });
 
-                Promise.all(geoLocationPromises).then(() => {
-                    console.log('Finished updating server geolocations');
-                });
+                await Promise.all(geoLocationPromises);
+                console.log('Finished updating server geolocations');
             }
 
-            document.addEventListener('DOMContentLoaded', updateServerStatus);
-            document.addEventListener('DOMContentLoaded', updateServerGeoLocation);
+            function getServerCracked(ip, port, version, timeout = 25000) {
+                version = version.replace(/[^0-9.]/g, '');
+                const controller = new AbortController();
+                const signal = controller.signal;
+
+                const fetchTimeout = setTimeout(() => {
+                    controller.abort();
+                }, timeout);
+
+                return fetch(\`https://ping.cornbread2100.com/cracked?ip=\${ip}&port=\${port}&version=\${version}\`, { method: "GET", mode: 'cors', headers: { 'Content-Type': 'application/json' }, signal })
+                    .then(response => {
+                        clearTimeout(fetchTimeout);
+                        return response.json();
+                    })
+                    .then(data => data)
+                    .catch(error => {
+                        if (error.name === 'AbortError') {
+                            console.error(\`Fetch request for cracked status timed out for \${ip}:\${port}\`);
+                        } else {
+                            console.error(\`Error fetching cracked status for \${ip}:\${port} - \${error.message}\`);
+                        }
+                        return null;
+                    });
+            }
+
+            async function updateServerCracked() {
+                const servers = document.querySelectorAll('.server');
+                const crackedPromises = Array.from(servers).map(async (server) => {
+                    const ip = server.getAttribute('data-ip');
+                    const port = server.getAttribute('data-port');
+                    const version = server.getAttribute('data-version');
+
+                    console.log(version);
+
+                    const data = await getServerCracked(ip, port, version);
+
+                    console.log(data);
+
+                    if (data) {
+                        server.querySelector('.cracked').textContent = 'cracked';
+                        server.querySelector('.cracked').style.backgroundColor = 'black';
+                        server.querySelector('.cracked').style.color = 'white';
+                    } else if(data == null) {
+                        server.querySelector('.cracked').textContent = 'unknown';
+                        server.querySelector('.cracked').style.backgroundColor = 'grey';
+                    }else {
+                        server.querySelector('.cracked').textContent = 'premium';
+                        server.querySelector('.cracked').style.backgroundColor = 'white';
+                        server.querySelector('.cracked').style.color = 'black';
+                    }
+                });
+
+                await Promise.all(crackedPromises);
+                console.log('Finished updating server cracked status');
+            }
+
+            function initialize() {
+                document.addEventListener('DOMContentLoaded', () => {
+                    updateServerStatus();
+                    updateServerGeoLocation();
+                    updateServerCracked();
+                });
+
+                if (document.readyState === 'complete' || document.readyState === 'interactive') {
+                    updateServerStatus();
+                    updateServerGeoLocation();
+                    updateServerCracked();
+                }
+            }
+
+            initialize();
         </script>
     `);
     res.write('<h2>Search Results</h2>');
@@ -432,7 +503,7 @@ function formatExtraDescription(extraDescription) {
 }
 
 function writeResponse(hostname, server, description, motd, res) {
-    res.write('<div class="server" data-ip="' + server.ip + '" data-port="' + server.port + '">');
+    res.write('<div class="server" data-ip="' + server.ip + '" data-port="' + server.port + '" data-version="'+server.version.replace(/[^0-9.]/g, '')+'">');
     if (server.icon) {
         res.write(`<img src="${server.icon}"/>`);
     } else {
@@ -484,6 +555,21 @@ function writeResponse(hostname, server, description, motd, res) {
             }
         </style>
         <p><span class="geolocation">loading geolocation...</span></p>
+        `);
+    res.write(`
+        <style>
+            .cracked {
+                font-size: 14px;
+                color: white;
+                background-color: grey;
+                padding: 5px;
+                border-radius: 5px;
+                position: absolute;
+                bottom: 40px;   
+                right: 10px;
+            }
+            </style>
+            <p><span class="cracked">loading cracked status...</span></p>
         `);
     res.write('</div>');
 }
@@ -554,7 +640,7 @@ function handleServerDetails(ip, res) {
                     document.addEventListener('DOMContentLoaded', updateServerStatus);
                 </script>
             </head>`);
-        res.write('<div class="server" data-ip="' + server.ip + '" data-port="' + server.port + '">');
+        res.write('<div class="server" data-ip="' + server.ip + '" data-port="' + server.port + ' data-version="'+server.version.replace(/[^0-9.]/g, '')+'">');
         if (server.icon) {
             res.write(`<img src="${server.icon}"/>`);
         } else {
