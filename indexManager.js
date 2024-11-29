@@ -19,6 +19,15 @@ if (fs.existsSync('./masscan.exe')) {
     }
 }
 
+// Set Git user name and email
+try {
+    git.addConfig('user.email', 'lawton37@hotmail.com');
+    git.addConfig('user.name', 'Lawtro37');
+} catch (err) {
+    console.error('Failed to set Git user name and email:', err);
+    process.exit(1);
+}
+
 const token = process.env.GITHUB_TOKEN; // GitHub Personal Access Token
 let indexerProcess;
 
