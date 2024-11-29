@@ -318,12 +318,16 @@ function handleSearchQuery(searchParams, res) {
                         server.querySelector('.status').textContent = 'online';
                         server.querySelector('.status').style.backgroundColor = 'green';
                         server.querySelector('.playercount').textContent = data.players.online || 0;
-                        server.querySelector('.eula').textContent = data.eula_blocked == false ? 'EULA compliant' : 'EULA blocked';
-                        server.querySelector('.eula').style.backgroundColor = data.eula_blocked == false ? 'green' : 'red';
                     } else {
                         server.querySelector('.status').textContent = 'offline';
                         server.querySelector('.status').style.backgroundColor = 'red';
                         server.querySelector('.playercount').textContent = 0;
+                    }
+
+                    if(data){
+                        server.querySelector('.eula').textContent = data.eula_blocked == false ? 'EULA compliant' : 'EULA blocked';
+                        server.querySelector('.eula').style.backgroundColor = data.eula_blocked == false ? 'green' : 'red';
+                    } else {
                         server.querySelector('.eula').textContent = 'unknown';
                         server.querySelector('.eula').style.backgroundColor = 'grey';
                     }
