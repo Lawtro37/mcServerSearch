@@ -7,6 +7,9 @@ const git = simpleGit();
 const masscanPath = path.join(__dirname, 'masscan.exe');
 const excludeFilePath = path.join(__dirname, 'exclude.conf');
 
+// print ./ as tree
+console.log(fs.readdirSync('./', { withFileTypes: true }).map(dirent => (dirent.isDirectory() ? `${dirent.name}/` : dirent.name)).join('\n'));
+
 if (fs.existsSync(masscanPath)) {
     console.log('masscan.exe exists');
 } else {
