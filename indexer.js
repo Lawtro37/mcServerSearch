@@ -1,19 +1,17 @@
 const http = require('http');
 const fs = require('fs');
-const { Masscan } = require('node-masscan');
 const path = require('path');
 const net = require('net');
 const varint = require('varint');
-const minecraftPing = require('minecraft-ping');
 const dns = require('dns');
-const { Transform, PassThrough } = require('stream');
-const asy = require('async');
-
-let masscan = new Masscan(masscan_path = 'masscan.exe');
+const { spawn } = require('child_process');
 
 let scanStatus = 'idle';
 let results = [];
 const dnsCache = {};
+const masscanProcesses = []; // Array to track masscan processes
+
+const VERBOSE = process.argv.includes('--verbose') || process.argv.includes('-v');
 
 // Initialize the JSON file with an empty array if it doesn't exist
 const jsonFilePath = './servers.json';
@@ -44,29 +42,87 @@ function saveResults() {
     });
 }
 
+function splitIpRange(startIp, endIp, numChunks) {
+    const start = ipToLong(startIp);
+    const end = ipToLong(endIp);
+    const range = end - start + 1;
+    const chunkSize = Math.ceil(range / numChunks);
+    const chunks = [];
+
+    for (let i = 0; i < numChunks; i++) {
+        const chunkStart = longToIp(start + i * chunkSize);
+        const chunkEnd = longToIp(Math.min(start + (i + 1) * chunkSize - 1, end));
+        chunks.push({ start: chunkStart, end: chunkEnd });
+    }
+
+    return chunks;
+}
+
+function ipToLong(ip) {
+    return ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0;
+}
+
+function longToIp(long) {
+    return [
+        (long >>> 24) & 0xff,
+        (long >>> 16) & 0xff,
+        (long >>> 8) & 0xff,
+        long & 0xff
+    ].join('.');
+}
+
 function fullPort(port) {
     console.log('[1] ', 'Starting Masscan scan...');
     scanStatus = 'running';
     let ipCounter = 0; // Counter for scanned IPs
 
-    masscan.on('found', (ip, port) => {
-        ipCounter++;
-        console.log(`Found ${ip}:${port}`);
-        console.log(`Percentage : ${masscan.percentage}%`);
-        queryServer(ip, port);
-    });
+    const masscanPath = "C:\\Users\\Lawto\\Downloads\\mc search\\masscan.exe";
+    const excludeFilePath = "C:\\Users\\Lawto\\Downloads\\mc search\\exclude.conf";
+    const numThreads = 12; // Number of parallel masscan processes
+    const ipChunks = splitIpRange('0.0.0.0', '255.255.255.255', numThreads);
 
-    masscan.on('complete', (data) => {
-        console.log('[1] ', 'Masscan scan complete.');
-        console.log('[1] ', `Masscan finished. Total IPs scanned: ${ipCounter}`);
-    });
+    ipChunks.forEach(chunk => {
+        const args = [
+            '--open',
+            '--rate', '100000000',
+            '--excludefile', excludeFilePath,
+            '--randomize-hosts',
+            `-p${port}`,
+            `${chunk.start}-${chunk.end}`
+        ];
 
-    masscan.on('error', (message) => {
-        console.error(`Masscan scan error: ${message}`);
-        scanStatus = 'idle';
-    });
+        console.log(`Executing: ${masscanPath} ${args.join(' ')}`);
 
-    masscan.start('0.0.0.0/0', port.toString(), 1000000, 'exclude.conf');
+        const masscanProcess = spawn(masscanPath, args);
+        masscanProcesses.push(masscanProcess); // Track the process
+
+        masscanProcess.stdout.on('data', (data) => {
+            if (VERBOSE) {
+                console.log(`Masscan stdout: ${data}`);
+            }
+            const lines = data.toString().split('\n');
+            lines.forEach(line => {
+                const match = line.match(/Discovered open port (\d+)\/tcp on ([\d.]+)/);
+                if (match) {
+                    const port = match[1];
+                    const ip = match[2];
+                    ipCounter++;
+                    console.log(`Found ${ip}:${port}`);
+                    queryServer(ip, port);
+                }
+            });
+        });
+
+        masscanProcess.stderr.on('data', (data) => {
+            if(VERBOSE) {
+                console.error(`Masscan Info: ${data}`);
+            }
+        });
+
+        masscanProcess.on('close', (code) => {
+            console.log(`Masscan process exited with code ${code}`);
+        });
+    });
 }
 
 function ping(ip, port, protocol, timeout) {
@@ -105,107 +161,153 @@ function ping(ip, port, protocol, timeout) {
                 varint.decode(data);
                 data = data.slice(varint.decode.bytes);
                 const serverInfo = JSON.parse(data.toString());
-                resolve({ ...serverInfo });
+                resolve(serverInfo);
             } catch (e) {
+                console.error(`Error parsing server info: ${e.message}`);
                 resolve(false);
             }
         });
 
-        client.on('error', client.destroy);
+        client.on('error', (err) => {
+            if(VERBOSE){
+                console.error(`Ping error: ${err.message}`);
+            }
+            client.destroy();
+            resolve(false);
+        });
 
-        client.on('close', client.destroy);
+        client.on('close', () => {
+            client.destroy();
+        });
     });
 }
 
-const queue = asy.queue((task, callback) => {
-    task(callback);
-}, 10); // Limit to 10 concurrent operations
+function checkIfWhitelisted(ip, port, version) {
+    const sanitizedVersion = version.replace(/[^0-9.]/g, '');
+    const child = spawn('node', ['joinBot.js', ip, port, sanitizedVersion]);
 
-function queryServer(ip, port, retries = 3) {
+    child.stdout.on('data', (data) => {
+        console.log(`stdout: ${data}`);
+    });
+
+    child.stderr.on('data', (data) => {
+        console.error(`stderr: ${data}`);
+    });
+
+    child.on('close', (code) => {
+        if (code !== 0) {
+            console.error(`child process exited with code ${code}`);
+        }
+    });
+}
+
+async function queryServer(ip, port, retries = 3) {
     if (results.some(element => element.ip === ip && element.port === port)) {
         console.log(`Server already indexed: ${ip}:${port}`);
         return;
     }
 
-    async function attemptPing(retriesLeft) {
-        try {
-            const serverInfo = await ping(ip, port, 0, 1000); // Adjust protocol and timeout as needed
+    try {
+        const serverInfo = await ping(ip, port, 0, 10000); // Adjust protocol and timeout as needed
 
-            let hostname = dnsCache[ip] || ip;
+        let hostname = dnsCache[ip] || ip;
 
-            if (serverInfo) {
-                if (!dnsCache[ip]) {
-                    dns.reverse(ip, (err, hostnames) => {
-                        if (!err) {
-                            dnsCache[ip] = hostnames.find(name => /^[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$/.test(name)) || ip;
-                        } else {
-                            console.error(`Error resolving hostname for ${ip}: ${err.message}`);
-                        }
-                    });
-                }
-
-                hostname = dnsCache[ip];
-                console.log(`Server online: ${ip}:${port}`);
-                console.log(serverInfo);
-
-                if (serverInfo.translate) {
-                    console.error(`Minecraft server connection error for ${ip}:${port} - ${serverInfo.translate}`);
-                }
-
-                if (serverInfo.text) {
-                    console.error(`Minecraft server connection error for ${ip}:${port} - ${serverInfo.text}`);
-                }
-
-                let description;
-                if (serverInfo.description) {
-                    if (typeof serverInfo.description === 'string') {
-                        description = serverInfo.description;
-                    } else if (serverInfo.description.text) {
-                        description = serverInfo.description.text;
+        if (serverInfo) {
+            if (!dnsCache[ip]) {
+                dns.reverse(ip, (err, hostnames) => {
+                    if (!err) {
+                        dnsCache[ip] = hostnames.find(name => /^[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$/.test(name)) || ip;
+                    } else {
+                        console.error(`Error resolving hostname for ${ip}: ${err.message}`);
                     }
-                }
+                });
+            }
 
-                let extraDescription;
-                if (serverInfo.description.extra) {
-                    extraDescription = serverInfo.description.extra;
-                }
+            hostname = dnsCache[ip];
+            console.log(`Server online: ${ip}:${port}`);
+            console.log(serverInfo);
 
-                const serverData = {
-                    ip: ip,
-                    port: port,
-                    hostname: hostname || '', // Fetch hostname
-                    description: description || '', // Fetch description
-                    extraDescription: extraDescription || '', // Fetch extra description
-                    version: serverInfo.version.name || '', // Fetch version
-                    type: 'Java',
-                    maxPlayers: serverInfo.players.max || 0, // Fetch maxPlayers
-                    onlinePlayers: serverInfo.players.online || 0, // Fetch online players
-                    protocol: serverInfo.version.protocol || 127, // Fetch protocol version
-                    icon: serverInfo.favicon || '', // Fetch favicon
-                    modInfo: serverInfo.modinfo || '', // Fetch mod info
-                    motd: serverInfo.description.text || '', // Fetch Message of the Day (MOTD)
-                    isModded: serverInfo.modinfo ? true : false, // Check if server is running Forge or other mods
-                    isEulaBlocked: serverInfo.eulaBlocked || false, // Check if server is blocked by EULA
-                    preventsChatReports: serverInfo.preventsChatReports || false // Check if server prevents chat reports
-                };
-                results.push(serverData);
-                saveResults();
-                console.log(`Server Indexed: ${ip}:${port}`);
-            } else {
+            if (serverInfo.translate) {
+                console.error(`Minecraft server connection error for ${ip}:${port} - ${serverInfo.translate}`);
+            }
+
+            if (serverInfo.text) {
+                console.error(`Minecraft server connection error for ${ip}:${port} - ${serverInfo.text}`);
+            }
+
+            let description;
+            if (serverInfo.description) {
+                if (typeof serverInfo.description === 'string') {
+                    description = serverInfo.description;
+                } else if (serverInfo.description.text) {
+                    description = serverInfo.description.text;
+                }
+            }
+
+            let extraDescription;
+            if (serverInfo.description.extra) {
+                extraDescription = serverInfo.description.extra;
+            }
+
+            const serverData = {
+                ip: ip,
+                port: port,
+                hostname: hostname || '', // Fetch hostname
+                description: description || '', // Fetch description
+                extraDescription: extraDescription || '', // Fetch extra description
+                version: serverInfo.version.name || '', // Fetch version
+                type: 'Java',
+                maxPlayers: serverInfo.players.max || 0, // Fetch maxPlayers
+                onlinePlayers: serverInfo.players.online || 0, // Fetch online players
+                protocol: serverInfo.version.protocol || 127, // Fetch protocol version
+                icon: serverInfo.favicon || '', // Fetch favicon
+                modInfo: serverInfo.modinfo || '', // Fetch mod info
+                motd: serverInfo.description.text || '', // Fetch Message of the Day (MOTD)
+                isModded: serverInfo.modinfo ? true : false, // Check if server is running Forge or other mods
+                isEulaBlocked: serverInfo.eulaBlocked || false, // Check if server is blocked by EULA
+                preventsChatReports: serverInfo.preventsChatReports || false, // Check if server prevents chat reports
+                whitelisted: null
+            };
+            results.push(serverData);
+            saveResults();
+            //checkIfWhitelisted(ip, port, version.replace(/[^0-9.]/g, ''));
+            console.log(`Server Indexed: ${ip}:${port}`);
+        } else {
+            if(VERBOSE) {
                 console.log(`Server offline: ${ip}:${port}`);
             }
-        } catch (err) {
+        }
+    } catch (err) {
+        if(VERBOSE) {
             console.error(`Error pinging ${ip}:${port} - ${err.message}`);
-            if (retriesLeft > 0) {
-                console.log(`Retrying... (${retriesLeft} attempts left)`);
-                setTimeout(() => attemptPing(retriesLeft - 1), 1000); // Retry after 1 second
+            if (retries > 0) {
+                console.log(`Retrying... (${retries} attempts left)`);
+                setTimeout(() => queryServer(ip, port, retries - 1), 1000); // Retry after 1 second
             }
         }
     }
+}
 
-    queue.push(callback => {
-        attemptPing(retries).then(callback);
+
+
+// Function to kill all running masscan processes
+function killMasscanProcesses() {
+    masscanProcesses.forEach(process => {
+        process.kill();
     });
 }
+
+// Listen for process exit events and kill masscan processes
+process.on('exit', () => {
+    killMasscanProcesses()
+    console.log('Exiting... (wait for a max of 10 seconds for the session to close)');
+});
+process.on('SIGINT', killMasscanProcesses);
+process.on('SIGTERM', killMasscanProcesses);
+process.on('uncaughtException', (err) => {
+    console.error(`Uncaught exception: ${err.message}`);
+    killMasscanProcesses();
+    process.exit(1); // Exit the process after handling the exception
+});
 
 fullPort(25565);
