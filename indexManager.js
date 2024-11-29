@@ -1,9 +1,13 @@
 const { spawn, execSync } = require('child_process');
 const simpleGit = require('simple-git');
 const fs = require('fs');
+const path = require('path');
 const git = simpleGit();
 
-if (fs.existsSync('./masscan.exe')) {
+const masscanPath = path.join(__dirname, 'masscan.exe');
+const excludeFilePath = path.join(__dirname, 'exclude.conf');
+
+if (fs.existsSync(masscanPath)) {
     console.log('masscan.exe exists');
 } else {
     console.error('masscan.exe does not exist - installing masscan');
@@ -32,6 +36,18 @@ const token = process.env.GITHUB_TOKEN; // GitHub Personal Access Token
 let indexerProcess;
 
 function runIndexer() {
+    if (!fs.existsSync(masscanPath)) {
+        console.error(`masscan.exe not found at ${masscanPath}`);
+        process.exit(1);
+    }
+
+    try {
+        fs.accessSync(masscanPath, fs.constants.X_OK);
+    } catch (err) {
+        console.error(`masscan.exe does not have execute permissions: ${err.message}`);
+        process.exit(1);
+    }
+
     indexerProcess = spawn('node', ['indexer.js']);
 
     console.log('Running indexer.js...');
@@ -67,25 +83,25 @@ runIndexer();
 // Listen for process exit events and kill the child process
 process.on('exit', () => {
     console.log('Exiting...');
-    indexerProcess.kill();
+    if (indexerProcess) indexerProcess.kill();
 });
 process.on('SIGINT', () => {
     console.log('Exiting...');
-    indexerProcess.kill();
+    if (indexerProcess) indexerProcess.kill();
     process.exit();
 });
 process.on('SIGTERM', () => {
     console.log('Exiting...');
-    indexerProcess.kill();
+    if (indexerProcess) indexerProcess.kill();
     process.exit();
 });
 process.on('uncaughtException', (err) => {
     console.error('Uncaught exception:', err);
-    indexerProcess.kill();
+    if (indexerProcess) indexerProcess.kill();
     process.exit(1);
 });
 process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled rejection at:', promise, 'reason:', reason);
-    indexerProcess.kill();
+    if (indexerProcess) indexerProcess.kill();
     process.exit(1);
 });
