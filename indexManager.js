@@ -3,26 +3,15 @@ const simpleGit = require('simple-git');
 const fs = require('fs');
 const git = simpleGit();
 
-if(fs.existsSync('./masscan.bin')) {
-    console.log('masscan.bin exists');
+if (fs.existsSync('./masscan.exe')) {
+    console.log('masscan.exe exists');
 } else {
     console.error('masscan.exe does not exist - installing masscan');
-    //sudo apt-get --assume-yes install git make gcc
-    //git clone https://github.com/robertdavidgraham/masscan
-    //cd masscan
-    //make
-
-    try{
-        execSync('git clone https://github.com/robertdavidgraham/masscan')
-        execSync('cd masscan');
-        execSync("Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))")
-        execSync('choco install make')
-        execSync('make');
-
-        //make install
-
-        execSync('make install');
-
+    try {
+        // Install Chocolatey if not installed
+        execSync('@powershell -NoProfile -ExecutionPolicy Bypass -Command "iex ((New-Object System.Net.WebClient).DownloadString(\'https://community.chocolatey.org/install.ps1\'))"');
+        // Install masscan using Chocolatey
+        execSync('choco install masscan -y');
         console.log('masscan installed');
     } catch (err) {
         console.error('Failed to install masscan:', err);
@@ -34,17 +23,16 @@ const token = process.env.GITHUB_TOKEN; // GitHub Personal Access Token
 let indexerProcess;
 
 function runIndexer() {
-    indexerProcess = spawn('node', ['indexerLinux.js']);
+    indexerProcess = spawn('node', ['indexer.js']);
 
     console.log('Running indexer.js...');
 
-
     indexerProcess.stdout.on('data', (data) => {
-        console.log(data);
+        console.log(data.toString());
     });
 
     indexerProcess.stderr.on('data', (data) => {
-        console.error(`error: ${data}`);
+        console.error(`error: ${data.toString()}`);
     });
 
     indexerProcess.on('close', async (code) => {
@@ -53,7 +41,7 @@ function runIndexer() {
         try {
             await git.add('servers.json');
             await git.commit('Update servers.json');
-            await git.push('https://Lawtro37:'+token+'@github.com/Lawtro37/mcServerSearch.git', 'main'); // Adjust branch name if necessary
+            await git.push(`https://${token}@github.com/Lawtro37/mcServerSearch.git`, 'main'); // Adjust branch name if necessary
             console.log('servers.json has been updated and pushed to GitHub.');
             
             //restart
@@ -66,7 +54,6 @@ function runIndexer() {
 }
 
 runIndexer();
-
 
 // Listen for process exit events and kill the child process
 process.on('exit', () => {
