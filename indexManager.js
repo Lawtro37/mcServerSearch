@@ -13,7 +13,6 @@ if(fs.existsSync('./masscan.bin')) {
     //make
 
     try{
-        execSync('apt-get --assume-yes install git make gcc');
         execSync('git clone https://github.com/robertdavidgraham/masscan')
         execSync('cd masscan');
         execSync('make');
