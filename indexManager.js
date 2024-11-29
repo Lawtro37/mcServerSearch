@@ -33,7 +33,7 @@ const token = process.env.GITHUB_TOKEN; // GitHub Personal Access Token
 let indexerProcess;
 
 function runIndexer() {
-    indexerProcess = spawn('node', ['indexer.js']);
+    indexerProcess = spawn('node', ['indexerLinux.js']);
 
     console.log('Running indexer.js...');
 
