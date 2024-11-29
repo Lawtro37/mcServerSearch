@@ -15,6 +15,7 @@ if(fs.existsSync('./masscan.bin')) {
     try{
         execSync('git clone https://github.com/robertdavidgraham/masscan')
         execSync('cd masscan');
+        execSync('choco install make')
         execSync('make');
 
         //make install
