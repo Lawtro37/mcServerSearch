@@ -76,8 +76,8 @@ function fullPort(port) {
     scanStatus = 'running';
     let ipCounter = 0; // Counter for scanned IPs
 
-    const masscanPath = "C:\\Users\\Lawto\\Downloads\\mc search\\masscan.exe";
-    const excludeFilePath = "C:\\Users\\Lawto\\Downloads\\mc search\\exclude.conf";
+    const masscanPath = "./masscan.exe";
+    const excludeFilePath = "./exclude.conf";
     const numThreads = 5; // Number of parallel masscan processes
     const ipChunks = splitIpRange('0.0.0.0', '255.255.255.255', numThreads);
 
