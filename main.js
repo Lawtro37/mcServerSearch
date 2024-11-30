@@ -4,6 +4,7 @@ const fs = require('fs');
 const dns = require('dns');
 const net = require('net');
 const varint = require('varint');
+const MiniSearch = require('minisearch');
 
 function formatMinecraftText(text) {
     if (typeof text != "string") return text;
@@ -57,6 +58,24 @@ function formatMinecraftText(text) {
 
 const data = JSON.parse(fs.readFileSync('servers.json'));
 
+// Initialize MiniSearch
+let miniSearch = new MiniSearch({
+    searchOptions: {
+        boost: { description: 2, motd: 1, hostname: 3, ip: 2 } // Boost the importance of certain fields
+
+    },
+    fields: ['description', 'motd', 'hostname', 'ip'], // Fields to index for full-text search
+    storeFields: ['description', 'motd', 'hostname', 'ip', 'version', 'type', 'maxPlayers', 'onlinePlayers', 'icon'], // Fields to return with search results
+    idField: 'id' // Field of the document to use as the document reference ID
+});
+
+// Add an 'id' field to each document
+data.forEach((doc, index) => {
+    doc.id = index.toString();
+});
+
+// Index the data
+miniSearch.addAll(data);
 const RESULTS_PER_PAGE = 25; // Number of results per page
 
 function getNetworkIP() {
@@ -131,6 +150,11 @@ function handleSearchQuery(searchParams, res) {
     const resultsPerPage = parseInt(searchParams.get('resultsPerPage')) || RESULTS_PER_PAGE;
     let results = data;
 
+    if (search) {
+        console.log(`searching for: ${search}`);
+        results = miniSearch.search(search).map(result => result);
+    }
+
     if (version && version !== 'all' && version !== '') {
         console.log(`filtering by version: ${version}`);
         results = results.filter(server => server.version.includes(version));
@@ -141,28 +165,13 @@ function handleSearchQuery(searchParams, res) {
         results = results.filter(server => server.type === edition);
     }
 
-    if (search) {
-        console.log(`searching for: ${search}`);
-        results = results.filter(server => {
-            const cleanedDescription = removeFormattingCodes(server.description || '') || "";
-            const cleanedMotd = removeFormattingCodes(server.motd || '') || "";
-            const cleanedHostname = removeFormattingCodes(server.hostname || '') || "";
-            const cleanedIp = removeFormattingCodes(server.ip || '') || "";
-
-            return (
-                cleanedDescription.toLowerCase().includes(search) ||
-                cleanedMotd.toLowerCase().includes(search) ||
-                cleanedHostname.toLowerCase().includes(search) ||
-                cleanedIp.toLowerCase().includes(search)
-            );
-        });
-    }
-
     const totalResults = results.length;
     const totalPages = Math.ceil(totalResults / resultsPerPage);
     const startIndex = (page - 1) * resultsPerPage;
     const endIndex = Math.min(startIndex + resultsPerPage, totalResults);
     results = results.slice(startIndex, endIndex);
+
+    const suggestions = miniSearch.autoSuggest(search, { fuzzy: 0.1 });
 
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.write(`
@@ -235,7 +244,7 @@ function handleSearchQuery(searchParams, res) {
                 <h1>Mc Server Search</h1>
                 <form action="/" method="get">
                     <label for="search">Search:</label>
-                    <input type="text" id="search" name="search">
+                    <input type="text" id="search" name="search" value="${search || ''}">
                     <label for="version">Version:</label>
                     <select id="version" name="version">
                         <option value="all">All</option>
@@ -290,6 +299,9 @@ function handleSearchQuery(searchParams, res) {
                         <option value="bedrock">Bedrock</option>
                     </select>
                     <input type="submit" value="Submit">
+                    <p id="suggestion">Did you mean: 
+                        ${suggestions.map(suggestion => `<a href="?search=${suggestion.suggestion}&version=${version}&edition=${edition}&page=1">${suggestion.suggestion}</a>`).join(', ')}
+                    </p>
                 </form>
             </div>
         </div>
@@ -602,10 +614,17 @@ function handleServerDetails(ip, res) {
         return;
     }
 
+    // Get suggestions for similar servers
+    const suggestions = miniSearch.search(removeFormattingCodes(server.description), { prefix: true, fuzzy: 0.1 }).map(result => result);
+    //console.log(suggestions);
+
     dns.reverse(server.ip, (err, hostnames) => {
         res.writeHead(200, { 'Content-Type': 'text/html' });
         res.write(`
             <head>
+                <title>Server Details - ${server.hostname || server.ip}</title>
+                <meta name="description" content="Details for Minecraft server ${server.hostname || server.ip}">
+                <meta name="keywords" content="Minecraft, server, details, ${server.hostname || server.ip}">
                 <style>
                     body { font-family: Arial; }
                     img { width: 64px; height: 64px; float: left; margin-right: 10px; }
@@ -616,7 +635,32 @@ function handleServerDetails(ip, res) {
                         position: relative;
                         margin-bottom: 20px; 
                         padding: 10px;
+                        border: 1px solid black;
+                        border-radius: 5px;
                         overflow: auto; /* Ensure the container clears the floated image */
+                    }
+                    .header {
+                        display: flex;
+                        align-items: center;
+                        margin-bottom: 10px;
+                        background-color: #555555;
+                        padding: 5px;
+                        border-radius: 5px;
+                    }
+                    .header img {
+                        width: 100px;
+                        height: 100px;
+                        margin-right: 20px;
+                    }
+                    .details {
+                        margin-top: 20px;
+                    }
+                    .details p {
+                        margin: 5px 0;
+                    }
+                    a, a:link, a:visited, a:hover, a:active {
+                        text-decoration: none;
+                        color: inherit;
                     }
                     @media (prefers-color-scheme: dark) {
                         body { background-color: #121212; color: #ffffff; }
@@ -628,38 +672,148 @@ function handleServerDetails(ip, res) {
                     }
                 </style>
                 <script>
-                    async function pingServer(ip, port) {
-                        try {
-                            const response = await fetch(\`https://api.mcsrvstat.us/3/\${ip}:\${port}\`);
-                            const data = await response.json();
-                            return data;
-                        } catch (error) {
-                            console.error(\`Error pinging \${ip}:\${port} - \${error.message}\`);
-                            return null;
-                        }
+                    function pingServer(ip, port) {
+                        return fetch(\`https://api.mcsrvstat.us/3/\${ip}:\${port}\`)
+                            .then(response => response.json())
+                            .then(data => {
+                                console.log(data);
+                                return data;
+                            })
+                            .catch(error => {
+                                console.error(\`Error pinging \${ip}:\${port} - \${error.message}\`);
+                                return null;
+                            });
                     }
 
                     async function updateServerStatus() {
-                        const server = document.querySelector('.server');
-                        const ip = server.getAttribute('data-ip');
-                        const port = server.getAttribute('data-port');
-                        const data = await pingServer(ip, port);
+                        const servers = document.querySelectorAll('.server');
+                        const pingPromises = Array.from(servers).map(async (server) => {
+                            const ip = server.getAttribute('data-ip');
+                            const port = server.getAttribute('data-port');
+                            const data = await pingServer(ip, port);
 
-                        if (data && data.online) {
-                            server.querySelector('.status').textContent = 'online';
-                            server.querySelector('.status').style.backgroundColor = 'green';
-                            server.querySelector('.playercount').textContent = data.players.online || 0;
-                        } else {
-                            server.querySelector('.status').textContent = 'offline';
-                            server.querySelector('.status').style.backgroundColor = 'red';
-                            server.querySelector('.playercount').textContent = 0;
+                            if (data && data.online) {
+                                server.querySelector('.status').textContent = 'online';
+                                server.querySelector('.status').style.backgroundColor = 'green';
+                                server.querySelector('.playercount').textContent = data.players.online || 0;
+                                server.querySelector('.eula').textContent = data.eula_blocked == false ? 'EULA compliant' : 'EULA blocked';
+                                server.querySelector('.eula').style.backgroundColor = data.eula_blocked == false ? 'green' : 'red';
+                            } else {
+                                server.querySelector('.status').textContent = 'offline';
+                                server.querySelector('.status').style.backgroundColor = 'red';
+                                server.querySelector('.playercount').textContent = 0;
+                                server.querySelector('.eula').textContent = 'unknown';
+                                server.querySelector('.eula').style.backgroundColor = 'grey';
+                            }
+                        });
+
+                        await Promise.all(pingPromises);
+                    }
+
+                    function findServerGeoLocation(ip) {
+                        return fetch(\`http://ip-api.com/json/\${ip}\`, { method: "GET", mode: 'cors', headers: { 'Content-Type': 'application/json' }})
+                            .then(response => response.json())
+                            .then(data => data)
+                            .catch(error => {
+                                console.error(\`Error fetching geolocation for \${ip} - \${error.message}\`);
+                                return null;
+                            });
+                    }
+
+                    async function updateServerGeoLocation() {
+                        const servers = document.querySelectorAll('.server');
+                        const geoLocationPromises = Array.from(servers).map(async (server) => {
+                            const ip = server.getAttribute('data-ip');
+                            const data = await findServerGeoLocation(ip);
+                            console.log(data);
+
+                            if (data) {
+                                server.querySelector('.geolocation').textContent = data.country || 'unknown';
+                                server.querySelector('.geolocation').style.backgroundColor = 'green';
+                            } else {
+                                server.querySelector('.geolocation').style.backgroundColor = 'red';
+                                server.querySelector('.geolocation').textContent = 'unknown';
+                            }
+                        });
+
+                        await Promise.all(geoLocationPromises);
+                        console.log('Finished updating server geolocations');
+                    }
+
+                    function getServerCracked(ip, port, version, timeout = 25000) {
+                        version = version.replace(/[^0-9.]/g, '');
+                        const controller = new AbortController();
+                        const signal = controller.signal;
+
+                        const fetchTimeout = setTimeout(() => {
+                            controller.abort();
+                        }, timeout);
+
+                        return fetch(\`https://ping.cornbread2100.com/cracked?ip=\${ip}&port=\${port}&version=\${version}\`, { method: "GET", mode: 'cors', headers: { 'Content-Type': 'application/json' }, signal })
+                            .then(response => {
+                                clearTimeout(fetchTimeout);
+                                return response.json();
+                            })
+                            .then(data => data)
+                            .catch(error => {
+                                if (error.name === 'AbortError') {
+                                    console.error(\`Fetch request for cracked status timed out for \${ip}:\${port}\`);
+                                } else {
+                                    console.error(\`Error fetching cracked status for \${ip}:\${port} - \${error.message}\`);
+                                }
+                                return null;
+                            });
+                    }
+
+                    async function updateServerCracked() {
+                        const servers = document.querySelectorAll('.server');
+                        const crackedPromises = Array.from(servers).map(async (server) => {
+                            const ip = server.getAttribute('data-ip');
+                            const port = server.getAttribute('data-port');
+                            const version = server.getAttribute('data-version');
+
+                            console.log(version);
+
+                            const data = await getServerCracked(ip, port, version);
+
+                            console.log(data);
+
+                            if (data) {
+                                server.querySelector('.cracked').textContent = 'cracked';
+                                server.querySelector('.cracked').style.backgroundColor = 'black';
+                                server.querySelector('.cracked').style.color = 'white';
+                            } else if(data == null) {
+                                server.querySelector('.cracked').textContent = 'unknown';
+                                server.querySelector('.cracked').style.backgroundColor = 'grey';
+                            }else {
+                                server.querySelector('.cracked').textContent = 'premium';
+                                server.querySelector('.cracked').style.backgroundColor = 'white';
+                                server.querySelector('.cracked').style.color = 'black';
+                            }
+                        });
+
+                        await Promise.all(crackedPromises);
+                        console.log('Finished updating server cracked status');
+                    }
+
+                    function initialize() {
+                        document.addEventListener('DOMContentLoaded', () => {
+                            updateServerStatus();
+                            updateServerGeoLocation();
+                            updateServerCracked();
+                        });
+
+                        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+                            updateServerStatus();
+                            updateServerGeoLocation();
+                            updateServerCracked();
                         }
                     }
 
-                    document.addEventListener('DOMContentLoaded', updateServerStatus);
+                    initialize();
                 </script>
             </head>`);
-        res.write('<div class="server" data-ip="' + server.ip + '" data-port="' + server.port + ' data-version="'+server.version.replace(/[^0-9.]/g, '')+'">');
+        res.write('<div class="server" data-ip="' + server.ip + '" data-port="' + server.port + '" data-version="'+server.version.replace(/[^0-9.]/g, '')+'">');
         if (server.icon) {
             res.write(`<img src="${server.icon}"/>`);
         } else {
@@ -690,9 +844,53 @@ function handleServerDetails(ip, res) {
             </style>
             <p class="status">loading...</p>
         `);
-        res.write(`<div class="space"></div>`);
-        res.write(`<div class="space"></div>`);
-        res.write(`<h1>dev Info</h1>`);
+        res.write(`
+            <style>
+                .geolocation {
+                    font-size: 14px;
+                    color: white;
+                    background-color: grey;
+                    padding: 5px;
+                    border-radius: 5px;
+                    position: absolute;
+                    bottom: 10px;   
+                    right: 10px;
+                }
+            </style>
+            <p><span class="geolocation">loading geolocation...</span></p>
+        `);
+        res.write(`
+            <style>
+                .cracked {
+                    font-size: 14px;
+                    color: white;
+                    background-color: grey;
+                    padding: 5px;
+                    border-radius: 5px;
+                    position: absolute;
+                    bottom: 40px;   
+                    right: 10px;
+                }
+            </style>
+            <p><span class="cracked">loading cracked status...</span></p>
+        `);
+        res.write(`
+            <style>
+                .eula {
+                    font-size: 14px;
+                    color: white;
+                    background-color: grey;
+                    padding: 5px;
+                    border-radius: 5px;
+                    position: absolute;
+                    bottom: 70px;   
+                    right: 10px;
+                }
+            </style>
+            <p><span class="eula">loading eula compliance...</span></p>
+        `);
+        res.write(`<div class="details">`);
+        res.write(`<h1>Server Details</h1>`);
         let formattedJson = JSON.stringify(server, null, 2)
             .replace(/\n/g, '<br>')
             .replace(/ /g, '&nbsp;');
@@ -700,6 +898,25 @@ function handleServerDetails(ip, res) {
         res.write('<p>hostnames: </p>');
         res.write(`<pre>${hostnames || ""}</pre>`);
         res.write('</div>');
+        res.write('</div>');
+
+        // Suggested servers section
+        res.write(`<div class="suggestServers">
+            <h2 style="margin-bottom: 20px">Similar Servers:</h2>
+            ${suggestions.map(suggestion => {
+                if (suggestion.ip === server.ip) return '';
+                if (suggestion.score < 10) return '';
+                return `
+                    <div class="server">
+                        <a href="/server?ip=${server.ip}"><h3>${suggestion.hostname || suggestion.ip}</h3></a>
+                        <p>${formatMinecraftText(suggestion.description) || "no description"}</p>
+                        <p>version: ${suggestion.version || "unknown version"}</p>
+                        <p>players: <span class="playercount">loading...</span>/${server.maxPlayers || "?"}</p>
+                    </div>
+                `;
+            }).join('')}
+        </div>`);
+
         res.end();
     });
 }
