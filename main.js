@@ -300,7 +300,10 @@ function handleSearchQuery(searchParams, res) {
                     </select>
                     <input type="submit" value="Submit">
                     <p id="suggestion">Did you mean: 
-                        ${suggestions.map(suggestion => `<a href="?search=${suggestion.suggestion}&version=${version}&edition=${edition}&page=1">${suggestion.suggestion}</a>`).join(', ')}
+                        ${suggestions
+                            .filter(suggestion => suggestion.suggestion.toLowerCase() !== search.toLowerCase())
+                            .map(suggestion => `<a href="?search=${suggestion.suggestion}&version=${version}&edition=${edition}&page=1">${suggestion.suggestion}</a>`)
+                            .join(', ')}
                     </p>
                 </form>
             </div>
