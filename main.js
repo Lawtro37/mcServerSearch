@@ -962,9 +962,13 @@ const server = http.createServer((req, res) => {
             res.writeHead(200, { 'Content-Type': 'text/plain' });
             res.write(fs.readFileSync('./website/robots.txt'));
             res.end();
-        } else if (path === '/robots.txt') {
+        } else if (path === '/robots') {
             res.writeHead(200, { 'Content-Type': 'text/plain' });
             res.write(fs.readFileSync('./website/robots.txt'));
+            res.end();
+        } else if (path === '/findServers') {
+            res.writeHead(200, { 'Content-Type': 'text/plain' });
+            res.write(fs.readFileSync('./website/findServers.html'));
             res.end();
         } else {
             res.writeHead(404, { 'Content-Type': 'text/html' });
