@@ -31,6 +31,9 @@ const server = http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');
     res.setHeader('Access-Control-Allow-Credentials', true);
 
+    // Set Cache-Control header
+    res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+
     const perams = req.url.split('/');
 
     if (req.url === '/favicon.ico') {
