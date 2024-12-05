@@ -310,7 +310,7 @@ function handleSearchQuery(searchParams, res) {
         </div>
         <script>
             function pingServer(ip, port) {
-                return fetch(\`https://api-mcserversearch.lawtrostudios.com/\${ip}/\${port}\`)
+                return fetch(\`https://api-mcserversearch.lawtrostudios.com/status/1/\${ip}/\${port}\`)
                     .then(response => response.json())
                     .then(data => {
                         console.log(data);
