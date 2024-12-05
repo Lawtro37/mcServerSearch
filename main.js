@@ -678,7 +678,7 @@ function handleServerDetails(ip, res) {
                 </style>
                 <script>
                     function pingServer(ip, port) {
-                        return fetch(\`https://api.mcsrvstat.us/3/\${ip}:\${port || "25565"}\`)
+                        return fetch(\`https://api-mcserversearch.lawtrostudios.com/status/1/\${ip}/\${port || "25565"}\`)
                             .then(response => response.json())
                             .then(data => {
                                 console.log(data);
@@ -926,7 +926,7 @@ function handleServerDetails(ip, res) {
                 if (suggestion.ip === server.ip) return '';
                 if (suggestion.score < 10) return '';
                 return `
-                    <div class="server">
+                    <div class="server" data-ip="${server.ip}" data-port="${server.port}" data-version="${server.version.replace(/[^0-9.]/g, '')}>
                         <a href="/server?ip=${server.ip}"><h3>${suggestion.hostname || suggestion.ip}</h3></a>
                         <p>${formatMinecraftText(suggestion.description) || "no description"}</p>
                         <p>version: ${suggestion.version || "unknown version"}</p>
