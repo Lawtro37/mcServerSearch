@@ -722,7 +722,7 @@ function handleServerDetails(ip, res) {
                     function createPlayerTable(players) {
                         let table = '<table><tr><th>Name</th><th>UUID</th></tr>';
                         players.forEach(player => {
-                            table += \`<tr><td>${player.name}</td><td>${player.uuid}</td></tr>\`;
+                            table += \`<tr><td>\${player.name}</td><td>\${player.uuid}</td></tr>\`;
                         });
                         table += '</table>';
                         return table;
