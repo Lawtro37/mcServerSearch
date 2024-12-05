@@ -310,7 +310,7 @@ function handleSearchQuery(searchParams, res) {
         </div>
         <script>
             function pingServer(ip, port) {
-                return fetch(\`https://api-mcserversearch.lawtrostudios.com/status/1/\${ip}/\${port}\`)
+                return fetch(\`https://api-mcserversearch.lawtrostudios.com/status/1/\${ip}/\${port || "25565"}\`)
                     .then(response => response.json())
                     .then(data => {
                         console.log(data);
@@ -335,6 +335,8 @@ function handleSearchQuery(searchParams, res) {
                         server.querySelector('.playercount').textContent = data.players.online || 0;
                         server.querySelector('.eula').textContent = data.eula_blocked == false ? 'EULA compliant' : 'EULA blocked';
                         server.querySelector('.eula').style.backgroundColor = data.eula_blocked == false ? 'green' : 'red';
+                        // update server details
+                        server.getElementByTagName('img')[0].src = data.icon || server.getElementByTagName('img')[0].src;
                     } else {
                         server.querySelector('.status').textContent = 'offline';
                         server.querySelector('.status').style.backgroundColor = 'red';
@@ -676,7 +678,7 @@ function handleServerDetails(ip, res) {
                 </style>
                 <script>
                     function pingServer(ip, port) {
-                        return fetch(\`https://api.mcsrvstat.us/3/\${ip}:\${port}\`)
+                        return fetch(\`https://api.mcsrvstat.us/3/\${ip}:\${port || "25565"}\`)
                             .then(response => response.json())
                             .then(data => {
                                 console.log(data);
@@ -701,6 +703,10 @@ function handleServerDetails(ip, res) {
                                 server.querySelector('.playercount').textContent = data.players.online || 0;
                                 server.querySelector('.eula').textContent = data.eula_blocked == false ? 'EULA compliant' : 'EULA blocked';
                                 server.querySelector('.eula').style.backgroundColor = data.eula_blocked == false ? 'green' : 'red';
+                                // update server details
+                                server.getElementByTagName('img')[0].src = data.icon || server.getElementByTagName('img')[0].src;
+                                // update server player list
+                                server.querySelector('.playerlist').innerHTML = data.players.list.length > 0 ? createPlayerTable(data.players.list) : 'no players online';
                             } else {
                                 server.querySelector('.status').textContent = 'offline';
                                 server.querySelector('.status').style.backgroundColor = 'red';
@@ -711,6 +717,15 @@ function handleServerDetails(ip, res) {
                         });
 
                         await Promise.all(pingPromises);
+                    }
+
+                    function createPlayerTable(players) {
+                        let table = '<table><tr><th>Name</th><th>UUID</th></tr>';
+                        players.forEach(player => {
+                            table += \`<tr><td>${player.name}</td><td>${player.uuid}</td></tr>\`;
+                        });
+                        table += '</table>';
+                        return table;
                     }
 
                     function findServerGeoLocation(ip) {
@@ -892,6 +907,7 @@ function handleServerDetails(ip, res) {
             </style>
             <p><span class="eula">loading eula compliance...</span></p>
         `);
+        res.write(`<div class="players"></div>`);
         res.write(`<div class="details">`);
         res.write(`<h1>Server Details</h1>`);
         let formattedJson = JSON.stringify(server, null, 2)
