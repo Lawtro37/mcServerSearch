@@ -25,6 +25,12 @@ function getNetworkIP() {
 }
 
 const server = http.createServer((req, res) => {
+    // Set CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+    res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');
+    res.setHeader('Access-Control-Allow-Credentials', true);
+
     const perams = req.url.split('/');
 
     if (req.url === '/favicon.ico') {
@@ -66,7 +72,7 @@ const server = http.createServer((req, res) => {
     }
 
     res.writeHead(400, { 'Content-Type': 'text/plain' });
-    res.end('Malformed request');
+    res.end('Malformed request \n structure: /status/1/ip/port');
 });
 
 function start() {
