@@ -4,7 +4,8 @@ const fs = require('fs');
 const os = require('os');
 const { env } = require('process');
 
-let servers = fs.readFileSync('servers.txt', 'utf8').split('\n');
+let servers = fs.readFileSync('servers.json')
+servers = JSON.parse(servers);
 let indexedIps = servers.length;
 
 // Get environment variables
