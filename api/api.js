@@ -4,6 +4,9 @@ const fs = require('fs');
 const os = require('os');
 const { env } = require('process');
 
+let servers = fs.readFileSync('servers.txt', 'utf8').split('\n');
+let indexedIps = servers.length;
+
 // Get environment variables
 let STRICT_REFERER = process.env.STRICT_REFERER || false;
 STRICT_REFERER = STRICT_REFERER === 'true' || STRICT_REFERER === '1';
@@ -39,6 +42,12 @@ const server = http.createServer((req, res) => {
     if (req.url === '/favicon.ico') {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
         res.end('Not found');
+        return;
+    }
+
+    if (req.url === '/servercount') {
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end(`${indexedIps}`);
         return;
     }
 
