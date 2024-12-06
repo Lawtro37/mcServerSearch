@@ -4,7 +4,7 @@ const fs = require('fs');
 const os = require('os');
 const { env } = require('process');
 
-let servers = fs.readFileSync('servers.json')
+let servers = fs.readFileSync('../servers.json')
 servers = JSON.parse(servers);
 let indexedIps = servers.length;
 
