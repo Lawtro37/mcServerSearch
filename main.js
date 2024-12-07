@@ -929,19 +929,19 @@ function handleServerDetails(ip, res) {
         res.write(`<pre>${hostnames || ""}</pre>`);
         res.write('</div>');
         res.write('</div>');
-v 
+
         // Suggested servers section
         res.write(`<div class="suggestServers">
             <h2 style="margin-bottom: 20px">Similar Servers:</h2>
-            ${suggestions.slice(0, 7).map(suggestion => {
+            ${suggestions.slice(0, 10).map(suggestion => {
                 if (suggestion.ip === server.ip) return '';
                 if (suggestion.score < 10) return '';
                 return `
-                    <div class="server" data-ip="${server.ip}" data-port="${server.port}" data-version="${server.version.replace(/[^0-9.]/g, '')}">
-                        <a href="/server?ip=${server.ip}"><h3>${suggestion.hostname || suggestion.ip}</h3></a>
+                    <div class="server" data-ip="${suggestion.ip}" data-port="${suggestion.port}" data-version="${suggestion.version.replace(/[^0-9.]/g, '')}">
+                        <a href="/server?ip=${suggestion.ip}"><h3>${suggestion.hostname || suggestion.ip}</h3></a>
                         <p>${formatMinecraftText(suggestion.description) || "no description"}</p>
                         <p>version: ${suggestion.version || "unknown version"}</p>
-                        <p>players: <span class="playercount">loading...</span>/${server.maxPlayers || "?"}</p>
+                        <p>players: <span class="playercount">loading...</span>/${suggestion.maxPlayers || "?"}</p>
                     </div>
                 `;
             }).join('')}
