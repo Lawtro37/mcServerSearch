@@ -621,13 +621,6 @@ function handleServerDetails(ip, res) {
 
     // Get suggestions for similar servers
     const suggestions = miniSearch.search(removeFormattingCodes(server.description), { prefix: true, fuzzy: 0.1 }).map(result => result);
-    //console.log(suggestions);
-
-    //TODO:
-    // fix suggested server info fetching
-    // fix suggested server info display
-    // fix "createPlayerTable" function
-    // add player head render to player list using https://crafatar.com/
 
     dns.reverse(server.ip, (err, hostnames) => {
         res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -710,9 +703,8 @@ function handleServerDetails(ip, res) {
                                 server.querySelector('.eula').textContent = data.eula_blocked == false ? 'EULA compliant' : 'EULA blocked';
                                 server.querySelector('.eula').style.backgroundColor = data.eula_blocked == false ? 'green' : 'red';
                                 // update server details
-                                server.getElementByTagName('img')[0].src = data.icon || server.getElementByTagName('img')[0].src;
+                                server.getElementsByTagName('img')[0].src = data.icon || server.getElementsByTagName('img')[0].src;
                                 // update server player list
-                                console.log(data.players.list);
                                 server.querySelector('.playerlist').innerHTML = data.players.list.length > 0 ? createPlayerTable(data.players.list) : 'no players online';
                             } else {
                                 server.querySelector('.status').textContent = 'offline';
@@ -732,8 +724,8 @@ function handleServerDetails(ip, res) {
                             table += \`<tr>
                                         <td>\${player.name}</td>
                                         <td>\${player.uuid}</td>
-                                        <td><img src="https://crafatar.com/avatars/\${player.uuid}?size=32&overlay" alt="\${player.name}'s head"></td>
-                                    </tr>\`;
+                                        <td><img src="https://crafatar.com/renders/head/\${player.uuid}" alt="\${player.name}'s head"></td>
+                                      </tr>\`;
                         });
                         table += '</table>';
                         return table;
@@ -839,7 +831,7 @@ function handleServerDetails(ip, res) {
                         }
                     }
 
-                    document.addEventListener('DOMContentLoaded', initialize);
+                    initialize();
                 </script>
             </head>`);
         res.write('<div class="server" data-ip="' + server.ip + '" data-port="' + server.port + '" data-version="'+server.version.replace(/[^0-9.]/g, '')+'">');
