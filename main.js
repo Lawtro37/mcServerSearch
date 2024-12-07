@@ -623,6 +623,12 @@ function handleServerDetails(ip, res) {
     const suggestions = miniSearch.search(removeFormattingCodes(server.description), { prefix: true, fuzzy: 0.1 }).map(result => result);
     //console.log(suggestions);
 
+    //TODO:
+    // fix suggested server info fetching
+    // fix suggested server info display
+    // fix "createPlayerTable" function
+    // add player head render to player list using https://crafatar.com/
+
     dns.reverse(server.ip, (err, hostnames) => {
         res.writeHead(200, { 'Content-Type': 'text/html' });
         res.write(`
@@ -706,6 +712,7 @@ function handleServerDetails(ip, res) {
                                 // update server details
                                 server.getElementByTagName('img')[0].src = data.icon || server.getElementByTagName('img')[0].src;
                                 // update server player list
+                                console.log(data.players.list);
                                 server.querySelector('.playerlist').innerHTML = data.players.list.length > 0 ? createPlayerTable(data.players.list) : 'no players online';
                             } else {
                                 server.querySelector('.status').textContent = 'offline';
@@ -720,9 +727,13 @@ function handleServerDetails(ip, res) {
                     }
 
                     function createPlayerTable(players) {
-                        let table = '<table><tr><th>Name</th><th>UUID</th></tr>';
+                        let table = '<table><tr><th>Name</th><th>UUID</th><th>Head</th></tr>';
                         players.forEach(player => {
-                            table += \`<tr><td>\${player.name}</td><td>\${player.uuid}</td></tr>\`;
+                            table += \`<tr>
+                                        <td>\${player.name}</td>
+                                        <td>\${player.uuid}</td>
+                                        <td><img src="https://crafatar.com/avatars/\${player.uuid}?size=32&overlay" alt="\${player.name}'s head"></td>
+                                    </tr>\`;
                         });
                         table += '</table>';
                         return table;
@@ -918,7 +929,7 @@ function handleServerDetails(ip, res) {
         res.write(`<pre>${hostnames || ""}</pre>`);
         res.write('</div>');
         res.write('</div>');
-
+v 
         // Suggested servers section
         res.write(`<div class="suggestServers">
             <h2 style="margin-bottom: 20px">Similar Servers:</h2>
