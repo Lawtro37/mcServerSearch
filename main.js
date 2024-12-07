@@ -839,7 +839,7 @@ function handleServerDetails(ip, res) {
                         }
                     }
 
-                    initialize();
+                    document.addEventListener('DOMContentLoaded', initialize);
                 </script>
             </head>`);
         res.write('<div class="server" data-ip="' + server.ip + '" data-port="' + server.port + '" data-version="'+server.version.replace(/[^0-9.]/g, '')+'">');
