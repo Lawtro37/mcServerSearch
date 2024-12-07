@@ -723,8 +723,8 @@ function handleServerDetails(ip, res) {
                         players.forEach(player => {
                             table += \`<tr>
                                         <td><img src="https://crafatar.com/renders/head/\${player.uuid}" alt="\${player.name}'s head"></td>
-                                        <td>\${player.name}     </td>
-                                        <td>     \${player.uuid}</td>
+                                        <td>\${player.name}‎‎‎‎</td>
+                                        <td>‎‎‎‎\${player.uuid}</td>
                                       </tr>\`;
                         });
                         table += '</table>';
