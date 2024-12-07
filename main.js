@@ -918,7 +918,7 @@ function handleServerDetails(ip, res) {
             </style>
             <p><span class="eula">loading eula compliance...</span></p>
         `);
-        res.write(`<div class="players"></div>`);
+        res.write(`<div class="playerlist"></div>`);
         res.write(`<div class="details">`);
         res.write(`<h1>Server Details</h1>`);
         let formattedJson = JSON.stringify(server, null, 2)
