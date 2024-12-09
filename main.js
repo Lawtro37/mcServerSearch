@@ -719,7 +719,7 @@ function handleServerDetails(ip, res) {
                     }
 
                     function createPlayerTable(players) {
-                        let table = '<table><tr><th>Name</th><th>UUID</th><th>Head</th></tr>';
+                        let table = '<table><tr><th></th><th></th><th></th></tr>';
                         players.forEach(player => {
                             table += \`<tr>
                                         <td><img src="https://crafatar.com/renders/head/\${player.uuid}" alt="\${player.name}'s head"></td>
