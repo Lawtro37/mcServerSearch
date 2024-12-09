@@ -629,6 +629,8 @@ function handleServerDetails(ip, res) {
                 <title>Server Details - ${server.hostname || server.ip}</title>
                 <meta name="description" content="Details for Minecraft server ${server.hostname || server.ip}">
                 <meta name="keywords" content="Minecraft, server, details, ${server.hostname || server.ip}">
+                <title>Mc Server Search</title>
+                ${fs.readFileSync("image2.txt")}
                 <style>
                     body { font-family: Arial; }
                     img { width: 64px; height: 64px; float: left; margin-right: 10px; }
